@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Crypto Card - Bybit API</title>
+    <style>
+      :root {
+        --bg: #181a20;
+        --card: #222531;
+        --accent: #46c1c1;
+        --text: #e5e7ef;
+        --up: #3dd68c;
+        --down: #e2513a;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Inter", sans-serif;
+        display: flex;
+        min-height: 100vh;
+        align-items: center;
+        justify-content: center;
+      }
+      .crypto-card {
+        background: var(--card);
+        border-radius: 1.5rem;
+        box-shadow: 0 6px 32px #0006;
+        width: 95vw;
+        max-width: 400px;
+        padding: 1.5rem 1rem;
+        margin: 1rem;
+        transition: background 0.3s;
+      }
+      .crypto-card.dark {
+        background: #fff;
+        color: #222;
+      }
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .pair-dropdown {
+        background: #23263a;
+        color: var(--accent);
+        border: none;
+        border-radius: 0.5rem;
+        padding: 0.3rem 0.6rem;
+        font-size: 1rem;
+      }
+      .stats {
+        margin: 1rem 0;
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+      }
+      .stat {
+        margin: 0.3rem 0;
+        flex: 1 0 40%;
+      }
+      .chart {
+        height: 120px;
+        background: #222a35;
+        border-radius: 0.7rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #444;
+        font-size: 0.8rem;
+      }
+      .buttons {
+        display: flex;
+        gap: 0.7rem;
+      }
+      .btn {
+        padding: 0.45rem 1rem;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .btn[aria-pressed="true"] {
+        background: #222a35;
+        color: var(--accent);
+      }
+      .percent {
+        font-weight: bold;
+      }
+      .percent.up {
+        color: var(--up);
+      }
+      .percent.down {
+        color: var(--down);
+      }
+      @media (max-width: 480px) {
+        .crypto-card {
+          padding: 1rem 0.2rem;
+          font-size: 0.98rem;
+        }
+        .chart {
+          height: 80px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="crypto-card" id="cryptoCard">
+      <div class="card-header">
+        <select id="pair" class="pair-dropdown">
+          <option value="BTCUSDT">BTC/USDT</option>
+          <option value="ETHUSDT">ETH/USDT</option>
+          <option value="SOLUSDT">SOL/USDT</option>
+        </select>
+        <div class="buttons">
+          <button class="btn" id="refreshBtn" title="Refresh now">
+            Refresh
+          </button>
+          <button
+            class="btn"
+            id="autoBtn"
+            aria-pressed="true"
+            title="Auto-update every 30s"
+          >
+            Auto
+          </button>
+        </div>
+      </div>
+      <div class="chart" id="chart">[Price chart here]</div>
+      <div class="stats">
+        <div class="stat">
+          <strong>Price:</strong> <span id="price">—</span>
+        </div>
+        <div class="stat">
+          <strong>24h Change:</strong>
+          <span class="percent" id="change">—</span>
+        </div>
+        <div class="stat"><strong>High:</strong> <span id="high">—</span></div>
+        <div class="stat"><strong>Low:</strong> <span id="low">—</span></div>
+        <div class="stat">
+          <strong>Volume:</strong> <span id="volume">—</span>
+        </div>
+      </div>
+    </div>
+    <script>
+      // --- CONFIG ---
+      const PAIRS = {
+        BTCUSDT: "BTC/USDT",
+        ETHUSDT: "ETH/USDT",
+        SOLUSDT: "SOL/USDT",
+      };
+      let currentPair = "BTCUSDT";
+      let auto = true,
+        timer = null,
+        cache = {};
+
+      // --- ELEMENTS ---
+      const priceEl = document.getElementById("price");
+      const highEl = document.getElementById("high");
+      const lowEl = document.getElementById("low");
+      const volEl = document.getElementById("volume");
+      const changeEl = document.getElementById("change");
+      const pairSel = document.getElementById("pair");
+      const refreshBtn = document.getElementById("refreshBtn");
+      const autoBtn = document.getElementById("autoBtn");
+
+      // --- FETCH DATA ---
+      async function fetchTicker(pair) {
+        try {
+          let resp = await fetch(
+            "https://api.bybit.com/v5/market/tickers?category=linear"
+          );
+          let data = await resp.json();
+          if (data && data.result && data.result.list) {
+            let tick = data.result.list.find((t) => t.symbol === pair);
+            if (tick) {
+              cache[pair] = tick; // cache for fallback
+              return tick;
+            }
+          }
+        } catch (e) {}
+        // fallback to cache if exists
+        return cache[pair] || null;
+      }
+
+      // --- UPDATE UI ---
+      function updateUI(tick) {
+        if (!tick) {
+          priceEl.textContent =
+            highEl.textContent =
+            lowEl.textContent =
+            volEl.textContent =
+            changeEl.textContent =
+              "—";
+          changeEl.className = "percent";
+          return;
+        }
+        priceEl.textContent = Number(tick.lastPrice).toLocaleString();
+        highEl.textContent = Number(tick.highPrice24h).toLocaleString();
+        lowEl.textContent = Number(tick.lowPrice24h).toLocaleString();
+        volEl.textContent = Number(tick.turnover24h).toLocaleString();
+        let pct = Number(tick.price24hPcnt) * 100;
+        changeEl.textContent = pct.toFixed(2) + "%";
+        changeEl.className = "percent " + (pct >= 0 ? "up" : "down");
+      }
+
+      // --- REFRESH LOGIC ---
+      async function refresh(pair) {
+        let tick = await fetchTicker(pair);
+        updateUI(tick);
+      }
+
+      // --- EVENT HANDLERS ---
+      pairSel.onchange = (e) => {
+        currentPair = e.target.value;
+        refresh(currentPair);
+      };
+      refreshBtn.onclick = () => refresh(currentPair);
+      autoBtn.onclick = () => {
+        auto = !auto;
+        autoBtn.setAttribute("aria-pressed", auto);
+        if (auto) startAuto();
+        else stopAuto();
+      };
+
+      // --- AUTO-REFRESH ---
+      function startAuto() {
+        stopAuto();
+        timer = setInterval(() => refresh(currentPair), 30000);
+        autoBtn.setAttribute("aria-pressed", "true");
+      }
+      function stopAuto() {
+        if (timer) clearInterval(timer);
+        autoBtn.setAttribute("aria-pressed", "false");
+      }
+
+      // --- INIT ---
+      (function () {
+        refresh(currentPair);
+        startAuto();
+      })();
+    </script>
+  </body>
+</html>
