@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Crypto Tweets Card</title>
+    <style>
+      /* Add your responsive/mobile styles here */
+      .tweet-card {
+        max-width: 400px;
+        margin: auto;
+        border-radius: 1.2em;
+        background: #181a20;
+        color: #fff;
+        padding: 1em;
+      }
+      .tweet-header {
+        display: flex;
+        gap: 0.5em;
+      }
+      #search {
+        flex: 1;
+        border-radius: 0.5em;
+        border: 1px solid #333;
+        padding: 0.5em;
+      }
+      .tweets-list {
+        max-height: 400px;
+        overflow-y: auto;
+        margin-top: 1em;
+      }
+      .tweet {
+        display: flex;
+        margin-bottom: 1em;
+      }
+      .avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        margin-right: 0.7em;
+      }
+      .tweet-body {
+        flex: 1;
+      }
+      .username {
+        font-weight: bold;
+      }
+      .time {
+        float: right;
+        color: #aaa;
+        font-size: 0.9em;
+      }
+      .tweet-actions {
+        margin-top: 0.5em;
+      }
+      .icon {
+        margin-right: 0.8em;
+        cursor: pointer;
+      }
+      @media (max-width: 500px) {
+        .tweet-card {
+          max-width: 98vw;
+          padding: 0.4em;
+        }
+        .tweet-text {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 180px;
+          display: inline-block;
+        }
+        .tweet-text.expanded {
+          white-space: normal;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="tweet-card">
+      <div class="tweet-header">
+        <input
+          id="search"
+          placeholder="Search or follow more crypto profiles..."
+        />
+        <button id="filterBtn">Followed Accounts</button>
+      </div>
+      <div class="tweets-list" id="tweetsList">Loading…</div>
+    </div>
+    <script>
+      const defaultAccounts = ["coinbureau", "binance"];
+      let followed = [...defaultAccounts];
+      let filterFollowed = false,
+        tweetLimit = 5;
+
+      function shorten(text) {
+        return window.innerWidth < 500 && text.length > 120
+          ? text.slice(0, 117) + "..."
+          : text;
+      }
+      function formatTime(timeStr) {
+        const date = new Date(timeStr);
+        return date.toLocaleString();
+      }
+      function renderTweet(tweet) {
+        return `<div class="tweet">
+    <img class="avatar" src="${tweet.user.profile_image_url}" alt="">
+    <div class="tweet-body">
+      <span class="username">@${tweet.user.username}</span>
+      <span class="time">${formatTime(tweet.created_at)}</span>
+      <div class="tweet-text" onclick="this.classList.toggle('expanded')">${shorten(
+        tweet.text
+      )}</div>
+      <div class="tweet-actions">
+        <span class="icon like" title="Like">❤️</span>
+        <span class="icon retweet" title="Retweet">🔁</span>
+        <span class="icon reply" title="Reply">💬</span>
+      </div>
+    </div>
+  </div>`;
+      }
+
+      async function fetchTweets(accounts) {
+        // Example endpoint; replace with your real one.
+        const url = `https://api.twitterdata.io/v1/accounts/${accounts.join(
+          ","
+        )}/tweets?limit=${tweetLimit}`;
+        const resp = await fetch(url);
+        if (!resp.ok) return [];
+        return resp.json();
+      }
+
+      async function loadTweets() {
+        document.getElementById("tweetsList").innerHTML = "Loading…";
+        let accounts = filterFollowed ? followed : defaultAccounts;
+        let data = await fetchTweets(accounts);
+        let html = (data.tweets || []).map(renderTweet).join("");
+        document.getElementById("tweetsList").innerHTML =
+          html || "No tweets found.";
+      }
+
+      // Event listeners:
+      document.getElementById("filterBtn").onclick = function () {
+        filterFollowed = !filterFollowed;
+        this.classList.toggle("active", filterFollowed);
+        loadTweets();
+      };
+      document.getElementById("search").onkeydown = function (e) {
+        if (e.key === "Enter") {
+          let val = this.value.replace(/@/g, "").trim();
+          if (val && !followed.includes(val)) {
+            followed.push(val);
+          }
+          loadTweets();
+          this.value = "";
+        }
+      };
+      // (Optional) Add infinite scroll:
+      document.getElementById("tweetsList").onscroll = function (e) {
+        if (this.scrollTop + this.offsetHeight >= this.scrollHeight - 10) {
+          tweetLimit += 5;
+          loadTweets();
+        }
+      };
+
+      loadTweets();
+    </script>
+  </body>
+</html>
