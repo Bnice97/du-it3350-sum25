@@ -1,61 +1,194 @@
-
 <!DOCTYPE html>
-<html>
-<head>
-  <link rel="stylesheet" href="css/main.css">
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="js/utils.js"></script>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-10MPPHLD10"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-10MPPHLD10');
-  </script>
-  <title>IT-3350 Dashboard</title>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CryptoCard — Fullscreen</title>
+    <style>
+      :root {
+        --bg: #0b0e14;
+        --card: #141826;
+        --text: #e6e9f2;
+        --muted: #a7b0c4;
+        --accent: #46c1c1;
+        --space: clamp(12px, 2vw, 24px);
+        --radius: clamp(12px, 2.5vw, 22px);
+        --fs-title: clamp(18px, 3.2vw, 28px);
+        --fs-body: clamp(14px, 2.2vw, 18px);
+        --fs-input: clamp(14px, 2.4vw, 18px);
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter,
+          sans-serif;
+      }
+      .page {
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: var(--space);
+      }
+      .card {
+        width: min(1100px, 96vw);
+        min-height: min(85dvh, 900px);
+        background: var(--card);
+        border-radius: var(--radius);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+        padding: clamp(16px, 3vw, 36px);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space);
+      }
+      h1 {
+        margin: 0;
+        font-size: var(--fs-title);
+        letter-spacing: 0.2px;
+      }
+      .grid {
+        display: grid;
+        gap: var(--space);
+        grid-template-columns: 1fr;
+      }
+      @media (min-width: 720px) {
+        .grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      label {
+        color: var(--muted);
+        font-size: var(--fs-body);
+      }
+      select,
+      input {
+        width: 100%;
+        padding: clamp(10px, 1.6vw, 14px) clamp(12px, 2vw, 16px);
+        border-radius: 12px;
+        border: 1px solid #23283a;
+        background: #101423;
+        color: var(--text);
+        font-size: var(--fs-input);
+      }
+      .actions {
+        display: flex;
+        gap: var(--space);
+        flex-wrap: wrap;
+      }
+      button {
+        border: 0;
+        border-radius: 12px;
+        padding: clamp(10px, 1.6vw, 14px) clamp(16px, 2.4vw, 20px);
+        background: var(--accent);
+        color: #061014;
+        font-weight: 700;
+        cursor: pointer;
+        font-size: var(--fs-body);
+      }
+      .ghost {
+        background: #23283a;
+        color: var(--accent);
+      }
+      .hint {
+        color: var(--muted);
+        font-size: var(--fs-body);
+      }
+      .result {
+        font-size: var(--fs-body);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <main class="card" role="main" aria-labelledby="title">
+        <h1 id="title">CryptoCard — Fullscreen</h1>
 
-  <script>
-    // Resize iframes dynamically based on their content
-    function resizeIframes() {
-      const iframes = document.querySelectorAll('iframe.card');
-      iframes.forEach(iframe => {
-        iframe.addEventListener('load', () => {
-          try {
-            const doc = iframe.contentWindow.document;
-            iframe.style.height = doc.body.scrollHeight + 'px';
-          } catch (e) {
-            console.warn('Could not access iframe content for resizing (CORS restriction).');
-          }
-        });
+        <div class="grid">
+          <div>
+            <label for="pair">Trading Pair</label>
+            <select id="pair" aria-label="Trading Pair">
+              <option value="BTCUSDT">BTC/USDT</option>
+              <option value="ETHUSDT">ETH/USDT</option>
+              <option value="SOLUSDT">SOL/USDT</option>
+            </select>
+          </div>
+          <div>
+            <label for="amount">Amount (USDT)</label>
+            <input
+              id="amount"
+              inputmode="decimal"
+              placeholder="e.g., 1200.50"
+              aria-describedby="amountHint"
+            />
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="validateBtn" type="button">Validate Amount</button>
+          <button id="clearBtn" class="ghost" type="button">Clear</button>
+        </div>
+        <p id="amountHint" class="hint">
+          Tip: try <code>-5</code> or <code>$1,2O0abc</code> to trigger edge
+          cases.
+        </p>
+        <div id="result" class="result" aria-live="polite"></div>
+      </main>
+    </div>
+
+    <script>
+      // same sanitize + handlers you already have; included for completeness
+      function sanitizeNumberLike(input) {
+        const s = String(input ?? "").trim();
+        if (!s) return { ok: false, reason: "empty" };
+        const cleaned = s.replace(/[\$,]/g, "");
+        if (!/^[+-]?\d*\.?\d+(e[+-]?\d+)?$/i.test(cleaned))
+          return { ok: false, reason: "nonnumeric", cleaned };
+        const num = Number(cleaned);
+        if (!Number.isFinite(num)) return { ok: false, reason: "notfinite" };
+        if (num < 0) return { ok: false, reason: "negative" };
+        if (num > 1e12) return { ok: false, reason: "toobig" };
+        return { ok: true, value: num, cleaned };
+      }
+      const amountEl = document.getElementById("amount");
+      const validateBtn = document.getElementById("validateBtn");
+      const clearBtn = document.getElementById("clearBtn");
+      const resultEl = document.getElementById("result");
+
+      function showAlert(r) {
+        const map = {
+          empty: "Please enter an amount.",
+          nonnumeric: "Please enter a valid number (e.g., 1200.50).",
+          notfinite: "Value is not finite.",
+          negative: "Amounts must be zero or positive.",
+          toobig: "Amount is too large. Please enter a smaller value.",
+        };
+        alert(map[r] ?? "Invalid amount.");
+      }
+
+      validateBtn.addEventListener("click", () => {
+        const res = sanitizeNumberLike(amountEl.value);
+        if (!res.ok) {
+          resultEl.textContent = "";
+          showAlert(res.reason);
+          return;
+        }
+        resultEl.textContent = `Accepted amount: ${res.value.toLocaleString(
+          undefined,
+          { maximumFractionDigits: 8 }
+        )} USDT`;
       });
-    }
-    window.onload = resizeIframes;
-  </script>
-</head>
 
-<body>
-  <center><h3>Web Widget Dashboard</h3></center>
-  <div class="cardContainer">
-    <iframe class="card" scrolling="no" style="width:450px; height:650px;" src="cards/catsapi.html"></iframe>
-    <iframe class="card" scrolling="no" src="cards/clock.html"></iframe>
-    <iframe class="card" scrolling="no" src="cards/random_dog.html"></iframe>
-    <iframe class="card" scrolling="no" src="cards/tron.html"></iframe>
-    <iframe class="card" scrolling="no" src="cards/currency.html"></iframe>
-    <iframe class="card" scrolling="no" style="width:400px;" src="cards/temperature.html"></iframe>
-    <iframe class="card" scrolling="no" src="cards/randomrecipe.html"></iframe>
-    <iframe class="card" scrolling="no" src="cards/nutritionix-api.html"></iframe>
-    <iframe class="card" scrolling="no" src="cards/quote.html"></iframe>
-    <iframe class="card" scrolling="no" src="cards/Date$Time.html"></iframe>
-    <iframe class="card" scrolling="no" src="cards/newcard_arg-template1.html"></iframe>
-    <iframe class="card" scrolling="no" src="cards/newcard_zaid.html"></iframe>
-    <iframe class="card" scrolling="no" src="cards/newcard_derrick.html"></iframe>
-    <iframe class="card" scrolling="yes" style='width:400px;' src="cards/NIST-NVD.html"></iframe>
-    <iframe class="card" scrolling="no" src="cards/rt-apod.html"></iframe>
-    <iframe class="card" scrolling="no" src="cards/dad_joke.html"></iframe>
-    <iframe class="card" scrolling="no" src="cards/zaid_pokemon.html"></iframe>
-    <iframe class="card" scrolling="no" src="cards/newcard_derrick.html"></iframe>
-</div>
-	</BODY>
-</HTML>
+      clearBtn.addEventListener("click", () => {
+        amountEl.value = "";
+        resultEl.textContent = "";
+        amountEl.focus();
+      });
+
+      amountEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") validateBtn.click();
+      });
+    </script>
+  </body>
+</html>
